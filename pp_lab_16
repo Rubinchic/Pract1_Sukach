@@ -1,0 +1,134 @@
+import datetime
+import json
+
+class Author:
+    def __init__(self, name):
+        self.name = name
+
+class Book:
+    def __init__(self, title, author: Author):
+        self.title = title
+        self.author = author
+        self.is_taken = False
+
+class User:
+    def __init__(self, name):
+        self.name = name
+
+class Library:
+    def __init__(self):
+        self.books = []
+        self.history = []
+
+    def add_book(self, book: Book):
+        self.books.append(book)
+        print(f"Додано книгу: '{book.title}' автора {book.author.name}")
+
+    def remove_book(self, book: Book):
+        if book in self.books:
+            self.books.remove(book)
+            print(f"Видалено книгу: '{book.title}'")
+        else:
+            print("Книга не знайдена у бібліотеці!")
+
+    def search_books(self, query):
+        found = [book for book in self.books if query.lower() in book.title.lower() or query.lower() in book.author.name.lower()]
+        print(f"Результати пошуку '{query}': {[book.title for book in found]}")
+        return found
+
+    def lend_book(self, book: Book, user: User):
+        if book not in self.books:
+            print("Книги немає у бібліотеці!")
+            return
+        if not book.is_taken:
+            book.is_taken = True
+            record = {
+                "book": book,
+                "user": user,
+                "taken_at": datetime.datetime.now(),
+                "returned_at": None
+            }
+            self.history.append(record)
+            print(f"Книга '{book.title}' видана користувачу {user.name}")
+        else:
+            print("Книга вже взята!")
+
+    def return_book(self, book: Book, user: User):
+        for record in self.history:
+            if record["book"] == book and record["user"] == user and record["returned_at"] is None:
+                book.is_taken = False
+                record["returned_at"] = datetime.datetime.now()
+                days_taken = (record["returned_at"] - record["taken_at"]).days
+                if days_taken > 14:
+                    print(f"Книга повернута із простроченням: {days_taken} днів")
+                else:
+                    print(f"Книга повернута вчасно ({days_taken} днів)")
+                return
+        print("Помилка: запис про видачу не знайдено")
+
+    def get_statistics(self):
+        book_popularity = {}
+        total_returns = 0
+        total_issued = 0
+        total_read_days = 0
+        read_counts = 0
+        for record in self.history:
+            title = record["book"].title
+            book_popularity[title] = book_popularity.get(title, 0) + 1
+            if record["returned_at"]:
+                total_returns += 1
+                days = (record["returned_at"] - record["taken_at"]).days
+                total_read_days += days
+                read_counts += 1
+            total_issued += 1
+        avg_read_days = total_read_days / read_counts if read_counts else 0
+        return_percentage = (total_returns / total_issued * 100) if total_issued else 0
+        stats = {
+            "Популярність книг": book_popularity,
+            "Відсоток повернення": round(return_percentage, 2),
+            "Середній час читання (днів)": round(avg_read_days, 2)
+        }
+        return stats
+
+    def export_statistics_json(self, file_path="library_stats.json"):
+        stats = self.get_statistics()
+        stats_simple = {
+            "Популярність книг": {str(k): int(v) for k, v in stats["Популярність книг"].items()},
+            "Відсоток повернення": stats["Відсоток повернення"],
+            "Середній час читання (днів)": stats["Середній час читання (днів)"]
+        }
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(stats_simple, f, ensure_ascii=False, indent=4)
+        print(f"Статистика збережена у {file_path}")
+
+if __name__ == "__main__":
+    author1 = Author("Джордж Орвелл")
+    author2 = Author("Філіп Дік")
+    book1 = Book("1984", author1)
+    book2 = Book("Колгосп тварин", author1)
+    book3 = Book("Чи сняться андроїдам електричні вівці?", author2)
+
+    user1 = User("Іван Петренко")
+    user2 = User("Олена Шевченко")
+
+    lib = Library()
+    lib.add_book(book1)
+    lib.add_book(book2)
+    lib.add_book(book3)
+
+    lib.search_books("орвелл")
+    lib.search_books("вівці")
+
+    lib.lend_book(book1, user1)
+    lib.lend_book(book2, user2)
+    lib.lend_book(book3, user1)
+
+    lib.return_book(book1, user1)
+    for record in lib.history:
+        if record["book"] == book2 and record["user"] == user2:
+            record["taken_at"] -= datetime.timedelta(days=20)
+    lib.return_book(book2, user2)
+
+    stats = lib.get_statistics()
+    print("Статистика бібліотеки:", stats)
+    lib.export_statistics_json()
