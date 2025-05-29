@@ -1,0 +1,99 @@
+class Book:
+    def __init__(self, title, author):
+        self.title = title
+        self.author = author
+
+class BookRepository:
+    def save(self, book: Book):
+        print(f"Збережено книгу: {book.title}")
+
+class BookDisplay:
+    def display(self, book: Book):
+        print(f"Книга: {book.title}, Автор: {book.author}")
+
+class BookUpdater:
+    def update(self, book: Book, title, author):
+        book.title = title
+        book.author = author
+        print("Оновлено інформацію про книгу")
+
+book = Book("1984", "Джордж Орвелл")
+repo = BookRepository()
+display = BookDisplay()
+updater = BookUpdater()
+
+repo.save(book)
+display.display(book)
+updater.update(book, "Колгосп тварин", "Джордж Орвелл")
+display.display(book)
+
+
+
+#--------------------------------2--------------------------
+from abc import ABC, abstractmethod
+
+class Payment(ABC):
+    @abstractmethod
+    def pay(self, amount):
+        pass
+
+class CreditCardPayment(Payment):
+    def pay(self, amount):
+        print(f"Оплачено {amount} грн кредитною карткою")
+
+class PayPalPayment(Payment):
+    def pay(self, amount):
+        print(f"Оплачено {amount} грн через PayPal")
+
+class CryptoPayment(Payment):
+    def pay(self, amount):
+        print(f"Оплачено {amount} грн криптовалютою")
+
+class ApplePayPayment(Payment):
+    def pay(self, amount):
+        print(f"Оплачено {amount} грн через Apple Pay")
+
+def process_payment(payment: Payment, amount):
+    payment.pay(amount)
+
+process_payment(CreditCardPayment(), 100)
+process_payment(PayPalPayment(), 150)
+process_payment(CryptoPayment(), 200)
+process_payment(ApplePayPayment(), 300)
+
+
+#----------------------------------3----------------------------
+from abc import ABC, abstractmethod
+
+class Notifier(ABC):
+    @abstractmethod
+    def send(self, message):
+        pass
+
+class EmailNotifier(Notifier):
+    def send(self, message):
+        print(f"Email: {message}")
+
+class SMSNotifier(Notifier):
+    def send(self, message):
+        print(f"SMS: {message}")
+
+class PushNotifier(Notifier):
+    def send(self, message):
+        print(f"Push: {message}")
+
+class TelegramNotifier(Notifier):
+    def send(self, message):
+        print(f"Telegram: {message}")
+
+class EventAlert:
+    def __init__(self, notifiers):
+        self.notifiers = notifiers
+    def notify(self, message):
+        for notifier in self.notifiers:
+            notifier.send(message)
+
+notifiers = [EmailNotifier(), SMSNotifier(), PushNotifier(), TelegramNotifier()]
+alert = EventAlert(notifiers)
+alert.notify("Термінова подія!")
+
