@@ -1,0 +1,119 @@
+import asyncio
+import os
+import aiohttp
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from dotenv import load_dotenv
+
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
+API_URL = "https://rubinchic.site/api/movies"
+
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
+# FSM для пошуку за роком
+class FindYear(StatesGroup):
+    waiting_for_year = State()
+
+# Функція для отримання фільмів з API
+async def fetch_movies():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(API_URL, ssl=False) as resp:
+            data = await resp.json()
+            return data
+
+# Форматування списку фільмів
+def format_movie(movie):
+    return (
+        f"🎬 <b>{movie['title']}</b>\n"
+        f"Рік: {movie['year']}\n"
+        f"Жанр: {movie['genre']}\n"
+        f"Режисер: {movie['director']}\n"
+        f"Рейтинг: {movie['rating']}\n"
+    )
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "Вітаю! Це бот-рекомендація фільмів 🎬\n"
+        "Доступні команди: /movies, /find_by_year, /sort_by_genre, /help, /info, /exit"
+    )
+
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    await message.answer(
+        "/movies — показати всі фільми\n"
+        "/find_by_year — знайти фільми за роком\n"
+        "/sort_by_genre — фільми по жанрах\n"
+        "/info — інформація про бота\n"
+        "/exit — завершити діалог"
+    )
+
+@dp.message(Command("info"))
+async def cmd_info(message: types.Message):
+    await message.answer(
+        "Бот отримує список фільмів із власного API та дозволяє шукати їх за роком або жанром.\n"
+        "API створено власноруч на Flask: https://rubinchic.site/api/movies\n"
+    )
+
+@dp.message(Command("exit"))
+async def cmd_exit(message: types.Message):
+    await message.answer("Дякуємо за використання! До зустрічі 👋")
+
+@dp.message(Command("movies"))
+async def cmd_movies(message: types.Message):
+    movies_raw = await fetch_movies()
+    movies = movies_raw.get("data", [])
+    if not movies:
+        await message.answer("Немає фільмів у базі.")
+        return
+    text = "\n".join([format_movie(m) for m in movies])
+    await message.answer(text, parse_mode="HTML")
+
+@dp.message(Command("find_by_year"))
+async def cmd_find_by_year(message: types.Message, state: FSMContext):
+    await message.answer("Введіть рік, за яким шукати фільми:")
+    await state.set_state(FindYear.waiting_for_year)
+
+@dp.message(FindYear.waiting_for_year)
+async def process_find_year(message: types.Message, state: FSMContext):
+    year = message.text.strip()
+    if not year.isdigit():
+        await message.answer("Будь ласка, введіть коректний рік (число).")
+        return
+    movies_raw = await fetch_movies()
+    movies = movies_raw.get("data", [])
+    found = [m for m in movies if str(m["year"]) == year]
+    if not found:
+        await message.answer("Фільмів за цей рік не знайдено.")
+    else:
+        text = "\n".join([format_movie(m) for m in found])
+        await message.answer(text, parse_mode="HTML")
+    await state.clear()
+
+@dp.message(Command("sort_by_genre"))
+async def cmd_sort_by_genre(message: types.Message):
+    movies_raw = await fetch_movies()
+    movies = movies_raw.get("data", [])
+    if not movies:
+        await message.answer("Немає фільмів у базі.")
+        return
+    # Групуємо по жанру
+    genres = {}
+    for m in movies:
+        genres.setdefault(m["genre"], []).append(m)
+    text = ""
+    for genre, films in genres.items():
+        text += f"\n<b>{genre.title()}:</b>\n"
+        for m in films:
+            text += f"  - {m['title']} ({m['year']})\n"
+    await message.answer(text, parse_mode="HTML")
+
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
